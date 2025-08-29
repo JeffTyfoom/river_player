@@ -759,7 +759,7 @@ internal class RiverPlayer(
                         val group = trackGroupArray[groupIndex]
                         for (groupElementIndex in 0 until group.length) {
                             val label = group.getFormat(groupElementIndex).label
-                            if (name == label && index == groupIndex) {
+                            if (name == label) {
                                 setAudioTrack(rendererIndex, groupIndex, groupElementIndex)
                                 return
                             }
@@ -785,24 +785,14 @@ internal class RiverPlayer(
 
     private fun setAudioTrack(rendererIndex: Int, groupIndex: Int, groupElementIndex: Int) {
         val mappedTrackInfo = trackSelector.currentMappedTrackInfo
-        if (mappedTrackInfo != null && exoPlayer != null) {
-            val override = TrackSelectionOverride(
-                mappedTrackInfo.getTrackGroups(rendererIndex).get(groupIndex),
-                listOf(groupElementIndex)
-            )
-
-            // Merge into parameters
-            val params = exoPlayer!!.trackSelectionParameters
-                .buildUpon()
-                .addOverride(override)
-                .build()
-
-            exoPlayer!!.trackSelectionParameters = params
-
-            // 🔑 Force rebuffer to apply the new audio track immediately
-            val wasPlaying = exoPlayer!!.isPlaying
-            exoPlayer!!.pause()
-            exoPlayer!!.playWhenReady = wasPlaying
+        if (mappedTrackInfo != null) {
+            exoPlayer?.trackSelectionParameters = TrackSelectionParameters.Builder().addOverride(
+                TrackSelectionOverride(
+                    mappedTrackInfo.getTrackGroups(
+                        rendererIndex
+                    ).get(groupIndex), groupElementIndex
+                )
+            ).build()
         }
     }
 
