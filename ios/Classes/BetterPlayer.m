@@ -712,23 +712,57 @@ static inline CGFloat radiansToDegrees(CGFloat radians) {
     [self setRestoreUserInterfaceForPIPStopCompletionHandler: true];
 }
 
-- (void) setAudioTrack:(NSString*) name index:(int) index{
-    AVMediaSelectionGroup *audioSelectionGroup = [[[_player currentItem] asset] mediaSelectionGroupForMediaCharacteristic: AVMediaCharacteristicAudible];
-    NSArray* options = audioSelectionGroup.options;
+- (void)setAudioTrack:(NSString*)name index:(int)index {
+    AVAsset *asset = [[_player currentItem] asset];
+    AVMediaSelectionGroup *audioSelectionGroup =
+        [asset mediaSelectionGroupForMediaCharacteristic:AVMediaCharacteristicAudible];
 
-
-    for (int audioTrackIndex = 0; audioTrackIndex < [options count]; audioTrackIndex++) {
-        AVMediaSelectionOption* option = [options objectAtIndex:audioTrackIndex];
-        NSArray *metaDatas = [AVMetadataItem metadataItemsFromArray:option.commonMetadata withKey:@"title" keySpace:@"comn"];
-        if (metaDatas.count > 0) {
-            NSString *title = ((AVMetadataItem*)[metaDatas objectAtIndex:0]).stringValue;
-            if ([name compare:title] == NSOrderedSame && audioTrackIndex == index ){
-                [[_player currentItem] selectMediaOption:option inMediaSelectionGroup: audioSelectionGroup];
-            }
-        }
-
+    if (!audioSelectionGroup) {
+        NSLog(@"No audio tracks found.");
+        return;
     }
 
+    NSArray *options = audioSelectionGroup.options;
+    if (index >= options.count) {
+        NSLog(@"Index out of range.");
+        return;
+    }
+
+    for (int i = 0; i < options.count; i++) {
+        AVMediaSelectionOption *option = options[i];
+
+        // Try title first
+        NSString *title = nil;
+        NSArray *metaDatas =
+            [AVMetadataItem metadataItemsFromArray:option.commonMetadata
+                                            withKey:@"title"
+                                           keySpace:AVMetadataKeySpaceCommon];
+
+        if (metaDatas.count > 0) {
+            title = ((AVMetadataItem*)metaDatas.firstObject).stringValue;
+        }
+
+        // Fallback to languageCode
+        if (!title && option.extendedLanguageTag) {
+            title = option.extendedLanguageTag;
+        } else if (!title && option.locale) {
+            title = option.locale.languageCode;
+        }
+
+        if ((title && [name isEqualToString:title]) || i == index) {
+            NSLog(@"Switching to audio track: %@", title);
+
+            // 🔑 Deselect first (sometimes needed)
+            [[_player currentItem] selectMediaOption:nil
+                           inMediaSelectionGroup:audioSelectionGroup];
+
+            [[_player currentItem] selectMediaOption:option
+                           inMediaSelectionGroup:audioSelectionGroup];
+            return;
+        }
+    }
+
+    NSLog(@"Audio track not found for name: %@ index: %d", name, index);
 }
 
 - (void)setMixWithOthers:(bool)mixWithOthers {
